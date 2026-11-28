@@ -9,6 +9,7 @@ The intended approach synchronizes player commands across clients. Each particip
 - **Monorepo**: pnpm workspaces + Turborepo
 - **Web**: Next.js, React, TypeScript
 - **API**: NestJS, TypeScript
+- **Data**: PostgreSQL 18 + Redis 8 (isolated development and production stacks)
 - **Realtime (planned)**: NestJS WebSocket gateway + Socket.IO
 - **Quality**: ESLint, Prettier, Husky, lint-staged, Commitlint
 - **Tests**: Vitest + Testing Library (web); Jest + Supertest (API)
@@ -29,7 +30,29 @@ docs/
   development.md
 ```
 
-## Quick start
+## Docker-first quick start
+
+Install Docker Desktop with Compose v2.32+ and start Docker Engine. For the initial Dockerization patch, regenerate the lockfile once (`pnpm install --no-frozen-lockfile`) before the first build; subsequent builds use the frozen lockfile. Generate local credentials once:
+
+```powershell
+node scripts/init-docker-env.mjs
+```
+
+Development (source sync and hot reload):
+
+```powershell
+docker compose --env-file .env.dev -f compose.dev.yaml up --build --watch
+```
+
+Production (separate stack, may run simultaneously):
+
+```powershell
+docker compose --env-file .env.prod -f compose.prod.yaml up --build -d --wait
+```
+
+See [Docker operations](docs/docker.md) for ports, smoke checks, persistence, secrets and deployment limitations.
+
+## Optional host-only development
 
 Install Node.js 24, use the pnpm version specified in `package.json`, then:
 
@@ -38,7 +61,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-The web UI runs on http://localhost:3000 and the API on http://localhost:3001.
+The host-only UI runs on http://localhost:3000 and the API on http://localhost:3001. Stop the Docker development stack first. Without database configuration, API liveness works but readiness returns 503.
 
 ## Checks
 
