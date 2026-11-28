@@ -1,0 +1,4 @@
+# Keep container scripts and repository text consistent across Windows/Linux.
+* text=auto eol=lf
+*.woff binary
+*.ico binary
