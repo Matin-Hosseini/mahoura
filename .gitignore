@@ -33,3 +33,5 @@ exports/
 .vscode/*.local.json
 apps/web/next-env.d.ts
 .docker-secrets/
+
+**/.party-media/

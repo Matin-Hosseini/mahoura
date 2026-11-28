@@ -31,11 +31,14 @@ Compose injects credentials as environment variables: Docker administrators can 
 
 ## Development
 
+For daily development, start from existing images without pulling or building, then start Watch in a separate terminal:
+
 ```powershell
-docker compose --env-file .env.dev -f compose.dev.yaml up --build --watch
+docker compose --env-file .env.dev -f compose.dev.yaml up -d --no-build --pull never --wait
+docker compose --env-file .env.dev -f compose.dev.yaml watch --no-up
 ```
 
-Compose Watch syncs files into the two separate application containers. Next.js HMR and NestJS watch execute on Linux; no Windows `node_modules`, `.next`, `.turbo` or `dist` directories are mounted. Dependency manifests and lockfile edits trigger a rebuild. Restart a service or rerun `up --build --watch` for changes to startup/compiler configuration. Update the Dockerfile manifest COPY list and watch rebuild triggers when adding a workspace. Docker/Compose definition changes require a new `up --build` invocation.
+On the first run, or when images need to be refreshed, use `up --build -d --wait` instead of the first command. Compose Watch syncs explicitly selected source paths into the two separate application containers. Next.js HMR and NestJS watch execute on Linux; Windows `node_modules`, `.next`, `.turbo` and `dist` are neither mounted nor selected for sync. Dependency manifests and lockfile edits trigger a rebuild even with `watch --no-up`. Changes outside watched paths require a rebuild to reach the containers. Update the Dockerfile manifest COPY list and watch rebuild triggers when adding a workspace. Restart Watch after editing Compose rules; apply runtime configuration changes with `up` and rebuild when image contents change. Recreating a container from an old image discards its previously synced files; start Watch again to sync the configured paths.
 
 To install a dependency, update the workspace manifest and lockfile together using the pinned pnpm version on the host, then let Watch rebuild. Do not modify a container's manifest as a substitute for committing the lockfile.
 

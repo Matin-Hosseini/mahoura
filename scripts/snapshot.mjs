@@ -19,6 +19,7 @@ const excludedDirectories = new Set([
   '.pnpm-store',
   '.venv',
   '.docker-secrets',
+  '.party-media',
   'node_modules',
   'dist',
   'build',
@@ -30,7 +31,7 @@ const excludedDirectories = new Set([
 
 const excludedFiles = new Set(['.npmrc', 'id_rsa', 'id_ed25519', 'snapshot_manifest.json']);
 
-const excludedExtensions = /\.(pem|key|p12|pfx|log|tsbuildinfo|mp4|mkv)$/i;
+const excludedExtensions = /\.(pem|key|p12|pfx|log|tsbuildinfo|mp4|mkv|webm|mov|avi|video)$/i;
 const maxFileSize = 5 * 1024 * 1024;
 
 function isExcluded(file) {

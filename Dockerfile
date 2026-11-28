@@ -9,8 +9,9 @@ ENV PNPM_HOME=/pnpm \
     TURBO_TELEMETRY_DISABLED=1
 WORKDIR /workspace
 RUN npm install --global pnpm@11.29.0 \
-    && mkdir -p /pnpm/store \
-    && chown -R node:node /pnpm /workspace
+    && mkdir -p /pnpm/store /var/lib/mahoura/media \
+    && touch /var/lib/mahoura/media/.keep \
+    && chown -R node:node /pnpm /workspace /var/lib/mahoura
 
 FROM base AS dependencies
 COPY --chown=node:node package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
@@ -33,6 +34,17 @@ ENV NODE_ENV=development
 EXPOSE 3000 3001
 
 
+# FFmpeg is needed only by the API, not the web development image.
+FROM dependencies AS api-development
+USER root
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+USER node
+COPY --chown=node:node . .
+ENV NODE_ENV=development
+EXPOSE 3001
+
 FROM source AS api-build
 RUN pnpm --filter api build
 RUN --mount=type=cache,id=mahoura-pnpm-store,target=/pnpm/store,uid=1000,gid=1000,sharing=locked \
@@ -42,6 +54,12 @@ RUN --mount=type=cache,id=mahoura-pnpm-store,target=/pnpm/store,uid=1000,gid=100
 FROM ${NODE_IMAGE} AS api-production
 ENV NODE_ENV=production PORT=3001 HOST=0.0.0.0
 WORKDIR /app
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /var/lib/mahoura/media \
+    && touch /var/lib/mahoura/media/.keep \
+    && chown -R node:node /var/lib/mahoura
 COPY --from=api-build --chown=node:node /workspace/api-runtime/ ./
 USER node
 EXPOSE 3001

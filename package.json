@@ -15,7 +15,8 @@
     "prepare": "husky",
     "snapshot": "node scripts/snapshot.mjs",
     "docker:env": "node scripts/init-docker-env.mjs",
-    "docker:smoke": "node scripts/docker-smoke.mjs"
+    "docker:smoke": "node scripts/docker-smoke.mjs",
+    "party:smoke": "node scripts/party-smoke.mjs"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.4",

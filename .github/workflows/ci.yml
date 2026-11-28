@@ -72,8 +72,12 @@ jobs:
           docker compose --env-file .env.prod -f compose.prod.yaml config --quiet
       - name: Start development stack
         run: docker compose --env-file .env.dev -f compose.dev.yaml up --build -d --wait --wait-timeout 300
+      - name: Verify private watch party on development
+        run: node scripts/party-smoke.mjs dev
       - name: Start production stack alongside development
         run: docker compose --env-file .env.prod -f compose.prod.yaml up --build -d --wait --wait-timeout 300
+      - name: Verify private watch party on production
+        run: node scripts/party-smoke.mjs prod
       - name: Smoke test and verify data isolation
         run: node scripts/docker-smoke.mjs both --exercise-dev-recovery
       - name: Print container status on failure
