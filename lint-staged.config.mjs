@@ -11,5 +11,6 @@ export default {
 
   'packages/ui/**/*.{js,jsx,ts,tsx}': (files) => eslintCommand('@repo/ui', files),
 
-  '**/*.{js,jsx,ts,tsx,json,md,mdx,yaml,yml,css,scss,html}': 'pnpm exec prettier --write',
+  '**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts,json,md,mdx,yaml,yml,css,scss,html}':
+    'pnpm exec prettier --write',
 };

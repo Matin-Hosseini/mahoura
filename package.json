@@ -13,7 +13,9 @@
     "test:e2e:api": "pnpm --filter api test:e2e",
     "verify": "pnpm format:check && pnpm lint && pnpm check-types && pnpm test && pnpm test:e2e:api && pnpm build",
     "prepare": "husky",
-    "snapshot": "node scripts/snapshot.mjs"
+    "snapshot": "node scripts/snapshot.mjs",
+    "docker:env": "node scripts/init-docker-env.mjs",
+    "docker:smoke": "node scripts/docker-smoke.mjs"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.4",
@@ -25,7 +27,7 @@
     "turbo": "^2.11.13",
     "typescript": "7.0.2"
   },
-  "packageManager": "pnpm@11.25.0",
+  "packageManager": "pnpm@11.29.0",
   "engines": {
     "node": ">=24"
   }

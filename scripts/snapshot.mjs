@@ -18,6 +18,7 @@ const excludedDirectories = new Set([
   '.vscode-test',
   '.pnpm-store',
   '.venv',
+  '.docker-secrets',
   'node_modules',
   'dist',
   'build',
@@ -27,7 +28,7 @@ const excludedDirectories = new Set([
   'exports',
 ]);
 
-const excludedFiles = new Set(['.npmrc', 'id_rsa', 'id_ed25519']);
+const excludedFiles = new Set(['.npmrc', 'id_rsa', 'id_ed25519', 'snapshot_manifest.json']);
 
 const excludedExtensions = /\.(pem|key|p12|pfx|log|tsbuildinfo|mp4|mkv)$/i;
 const maxFileSize = 5 * 1024 * 1024;
