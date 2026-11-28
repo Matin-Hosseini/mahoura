@@ -18,6 +18,8 @@ pnpm verify
 pnpm snapshot
 ```
 
+Docker is the recommended runtime. See [Docker operations](docker.md) for the two independent environments, source synchronization and data lifecycle. The ordinary host unit/API E2E checks use mocks for readiness; CI additionally exercises the actual databases and both running stacks.
+
 ## Git Flow
 
 Production: `main`. Integration: `develop`. Develop features from `develop`.

@@ -55,5 +55,37 @@ jobs:
       - name: Build
         run: pnpm build
 
+  docker:
+    name: Docker / Development / Production / Isolation
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Generate ephemeral CI credentials
+        run: node scripts/init-docker-env.mjs
+      - name: Validate Compose models
+        run: |
+          docker compose --env-file .env.dev -f compose.dev.yaml config --quiet
+          docker compose --env-file .env.prod -f compose.prod.yaml config --quiet
+      - name: Start development stack
+        run: docker compose --env-file .env.dev -f compose.dev.yaml up --build -d --wait --wait-timeout 300
+      - name: Start production stack alongside development
+        run: docker compose --env-file .env.prod -f compose.prod.yaml up --build -d --wait --wait-timeout 300
+      - name: Smoke test and verify data isolation
+        run: node scripts/docker-smoke.mjs both --exercise-dev-recovery
+      - name: Print container status on failure
+        if: failure()
+        run: |
+          docker compose --env-file .env.dev -f compose.dev.yaml ps -a
+          docker compose --env-file .env.prod -f compose.prod.yaml ps -a
+      - name: Remove ephemeral CI resources
+        if: always()
+        run: |
+          docker compose --env-file .env.dev -f compose.dev.yaml down -v --remove-orphans
+          docker compose --env-file .env.prod -f compose.prod.yaml down -v --remove-orphans
+
 # Browser E2E (Playwright) is intentionally disabled until its browser
 # binary can be installed reliably. The NestJS API E2E suite remains active.

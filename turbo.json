@@ -15,7 +15,8 @@
     },
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "passThroughEnv": ["HOST", "PORT", "CORS_ORIGINS", "POSTGRES_*", "REDIS_*"]
     },
     "test": {
       "dependsOn": ["^build"],
@@ -25,5 +26,6 @@
       "dependsOn": ["^build"],
       "outputs": ["coverage/**"]
     }
-  }
+  },
+  "globalEnv": ["API_INTERNAL_URL"]
 }
