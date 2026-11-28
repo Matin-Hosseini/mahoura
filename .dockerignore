@@ -25,3 +25,5 @@
 **/*.log
 exports
 SNAPSHOT_MANIFEST.json
+
+**/.party-media/

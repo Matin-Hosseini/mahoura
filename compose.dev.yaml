@@ -47,24 +47,34 @@ services:
     develop:
       watch:
         - action: sync
-          path: .
-          target: /workspace
+          path: ./apps/web/app
+          target: /workspace/apps/web/app
           initial_sync: true
-          ignore:
-            - package.json
-            - pnpm-lock.yaml
-            - pnpm-workspace.yaml
-            - apps/api/package.json
-            - apps/web/package.json
-            - packages/eslint-config/package.json
-            - packages/typescript-config/package.json
-            - packages/ui/package.json
-            - Dockerfile
-            - .dockerignore
-            - compose.dev.yaml
-            - compose.prod.yaml
-            - docker/
-            - docs/
+
+        - action: sync
+          path: ./apps/web/components
+          target: /workspace/apps/web/components
+          initial_sync: true
+
+        - action: sync
+          path: ./apps/web/public
+          target: /workspace/apps/web/public
+          initial_sync: true
+
+        - action: sync
+          path: ./packages/ui/src
+          target: /workspace/packages/ui/src
+          initial_sync: true
+
+        - action: sync+restart
+          path: ./apps/web/next.config.js
+          target: /workspace/apps/web/next.config.js
+          initial_sync: true
+
+        - action: sync+restart
+          path: ./apps/web/tsconfig.json
+          target: /workspace/apps/web/tsconfig.json
+          initial_sync: true
         - action: rebuild
           path: package.json
         - action: rebuild
@@ -91,7 +101,7 @@ services:
     image: mahoura-api:dev
     build:
       context: .
-      target: development
+      target: api-development
     command: ['pnpm', '--filter', 'api', 'dev']
     environment:
       NODE_ENV: development
@@ -106,6 +116,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: '6379'
       REDIS_PASSWORD: ${DEV_REDIS_PASSWORD:?Run node scripts/init-docker-env.mjs first}
+      PARTY_MEDIA_DIR: /var/lib/mahoura/media
     ports:
       - '127.0.0.1:3001:3001'
     depends_on:
@@ -113,6 +124,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    volumes:
+      - media_data:/var/lib/mahoura/media
     networks: [app, data]
     healthcheck:
       test:
@@ -129,24 +142,30 @@ services:
     develop:
       watch:
         - action: sync
-          path: .
-          target: /workspace
+          path: ./apps/api/src
+          target: /workspace/apps/api/src
           initial_sync: true
-          ignore:
-            - package.json
-            - pnpm-lock.yaml
-            - pnpm-workspace.yaml
-            - apps/api/package.json
-            - apps/web/package.json
-            - packages/eslint-config/package.json
-            - packages/typescript-config/package.json
-            - packages/ui/package.json
-            - Dockerfile
-            - .dockerignore
-            - compose.dev.yaml
-            - compose.prod.yaml
-            - docker/
-            - docs/
+
+        - action: sync
+          path: ./apps/api/test
+          target: /workspace/apps/api/test
+          initial_sync: true
+
+        - action: sync+restart
+          path: ./apps/api/nest-cli.json
+          target: /workspace/apps/api/nest-cli.json
+          initial_sync: true
+
+        - action: sync+restart
+          path: ./apps/api/tsconfig.json
+          target: /workspace/apps/api/tsconfig.json
+          initial_sync: true
+
+        - action: sync+restart
+          path: ./apps/api/tsconfig.build.json
+          target: /workspace/apps/api/tsconfig.build.json
+          initial_sync: true
+
         - action: rebuild
           path: package.json
         - action: rebuild
@@ -240,3 +259,4 @@ networks:
 volumes:
   postgres_data:
   redis_data:
+  media_data:
