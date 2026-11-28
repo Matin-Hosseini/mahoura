@@ -1,0 +1,156 @@
+name: mahoura-prod
+
+x-app: &app
+  init: true
+  restart: unless-stopped
+  stop_grace_period: 30s
+  cap_drop: [ALL]
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: '10m'
+      max-file: '3'
+
+services:
+  web:
+    <<: *app
+    image: mahoura-web:prod
+    build:
+      context: .
+      target: web-production
+    environment:
+      NODE_ENV: production
+      API_INTERNAL_URL: http://api:3001
+      HOSTNAME: 0.0.0.0
+      PORT: '3000'
+    ports:
+      - '127.0.0.1:8080:3000'
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [app]
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          fetch("http://127.0.0.1:3000/api/health",{signal:AbortSignal.timeout(7000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
+      interval: 15s
+      timeout: 8s
+      retries: 5
+      start_period: 30s
+
+  api:
+    <<: *app
+    image: mahoura-api:prod
+    build:
+      context: .
+      target: api-production
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: '3001'
+      CORS_ORIGINS: ${PROD_CORS_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: '5432'
+      POSTGRES_DB: mahoura_prod
+      POSTGRES_USER: mahoura_prod_app
+      POSTGRES_PASSWORD: ${PROD_POSTGRES_APP_PASSWORD:?Run node scripts/init-docker-env.mjs first}
+      REDIS_HOST: redis
+      REDIS_PORT: '6379'
+      REDIS_PASSWORD: ${PROD_REDIS_PASSWORD:?Run node scripts/init-docker-env.mjs first}
+    ports:
+      - '127.0.0.1:8081:3001'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [app, data]
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          fetch("http://127.0.0.1:3001/health/ready",{signal:AbortSignal.timeout(6000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
+      interval: 10s
+      timeout: 7s
+      retries: 6
+      start_period: 20s
+
+  postgres:
+    image: mahoura-postgres:prod
+    build:
+      context: ./docker/postgres
+    restart: unless-stopped
+    stop_grace_period: 60s
+    environment:
+      POSTGRES_DB: mahoura_prod
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${PROD_POSTGRES_ADMIN_PASSWORD:?Run node scripts/init-docker-env.mjs first}
+      APP_DB_USER: mahoura_prod_app
+      APP_DB_PASSWORD: ${PROD_POSTGRES_APP_PASSWORD:?Run node scripts/init-docker-env.mjs first}
+    ports:
+      - '127.0.0.1:5434:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    networks: [data]
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          PGPASSWORD="$$APP_DB_PASSWORD" psql -h 127.0.0.1 -U "$$APP_DB_USER" -d "$$POSTGRES_DB" -tAc "SELECT 1" | grep -qx 1
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment:
+      REDIS_PASSWORD: ${PROD_REDIS_PASSWORD:?Run node scripts/init-docker-env.mjs first}
+    command:
+      - sh
+      - -ec
+      - >-
+        exec docker-entrypoint.sh redis-server --appendonly yes --appendfsync everysec
+        --requirepass "$$REDIS_PASSWORD"
+    ports:
+      - '127.0.0.1:6381:6379'
+    volumes:
+      - redis_data:/data
+    networks: [data]
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -qx PONG
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+networks:
+  app:
+  data:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
