@@ -1,8 +1,8 @@
 # Mahoura Party
 
-**Mahoura Party** is a private watch-party project for watching videos together from separate locations. The product is in early development; the current web screen and API endpoints are still starter scaffolding.
+**Mahoura Party** is a private watch-party project for watching videos together from separate locations. The first watch-party feature includes private two-person rooms, host-uploaded sequential movies, synchronized playback, live chat with typing indicators, and reactions.
 
-The intended approach synchronizes player commands across clients. Each participant must access video they are permitted to watch; the project does not bundle or redistribute copyrighted media.
+The host uploads a video to the environment-specific media volume. Only authorized room members can stream it. Upload and share only media you have permission to share. See [Watch party](docs/watch-party.md) for the workflow, limits, and tests.
 
 ## Stack
 
@@ -10,7 +10,7 @@ The intended approach synchronizes player commands across clients. Each particip
 - **Web**: Next.js, React, TypeScript
 - **API**: NestJS, TypeScript
 - **Data**: PostgreSQL 18 + Redis 8 (isolated development and production stacks)
-- **Realtime (planned)**: NestJS WebSocket gateway + Socket.IO
+- **Realtime**: server-sent events (SSE) + HTTP commands, PostgreSQL room state
 - **Quality**: ESLint, Prettier, Husky, lint-staged, Commitlint
 - **Tests**: Vitest + Testing Library (web); Jest + Supertest (API)
 
@@ -32,17 +32,26 @@ docs/
 
 ## Docker-first quick start
 
-Install Docker Desktop with Compose v2.32+ and start Docker Engine. For the initial Dockerization patch, regenerate the lockfile once (`pnpm install --no-frozen-lockfile`) before the first build; subsequent builds use the frozen lockfile. Generate local credentials once:
+Install Docker Desktop with Compose v2.32+ and start Docker Engine. Builds use the frozen lockfile. Generate local database and Redis credentials:
 
 ```powershell
 node scripts/init-docker-env.mjs
 ```
 
-Development (source sync and hot reload):
+Development (first build):
 
 ```powershell
-docker compose --env-file .env.dev -f compose.dev.yaml up --build --watch
+docker compose --env-file .env.dev -f compose.dev.yaml up --build -d --wait
 ```
+
+Daily development with existing images (run Watch in a separate terminal):
+
+```powershell
+docker compose --env-file .env.dev -f compose.dev.yaml up -d --no-build --pull never --wait
+docker compose --env-file .env.dev -f compose.dev.yaml watch --no-up
+```
+
+Open http://localhost:3000, enter your name and create a room. Send the invitation link to your guest. Neither person needs a password. Keep the application on localhost or a private network accessible only to the two participants.
 
 Production (separate stack, may run simultaneously):
 
@@ -61,7 +70,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-The host-only UI runs on http://localhost:3000 and the API on http://localhost:3001. Stop the Docker development stack first. Without database configuration, API liveness works but readiness returns 503.
+The host-only UI runs on http://localhost:3000 and the API on http://localhost:3001. Stop the Docker development stack first. Without database configuration, API liveness works but readiness returns 503. Watch parties require configured PostgreSQL and API_INTERNAL_URL; Docker is the supported end-to-end development path.
 
 ## Checks
 

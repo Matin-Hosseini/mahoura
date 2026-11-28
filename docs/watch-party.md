@@ -1,0 +1,45 @@
+# Watch party — first vertical slice
+
+## Run and create a room
+
+```powershell
+node scripts/init-docker-env.mjs
+# Build once after dependency or Dockerfile changes.
+docker compose --env-file .env.dev -f compose.dev.yaml build api web
+docker compose --env-file .env.dev -f compose.dev.yaml up -d --no-build --pull never --wait
+# Optional, in a separate terminal for source changes:
+docker compose --env-file .env.dev -f compose.dev.yaml watch --no-up
+```
+
+Open http://localhost:3000. Enter your name and click **Create a room**. No account or host access code is required. Send the invitation link to your guest, who only needs to enter a name. Room access is still protected by the invite and automatic session cookies. Anyone who can reach the application can create a room, so use localhost or a private network limited to the two participants. Do not expose this version publicly. Existing host access code entries in `.env.dev` or `.env.prod` are ignored; keep your database and Redis credentials unchanged.
+
+1. Create a room and choose an MP4 (recommended H.264 + AAC) browser-compatible WebM, or MKV, up to 5 GiB. Upload completes before playback. MKV is automatically converted on the API server before playback. The guest can join while the upload is in progress.
+2. Copy the invitation link to a second browser profile or private browsing window. Enter a guest name. The invite is redeemed once, then the guest has a separate HttpOnly cookie. A reload in that profile preserves the session until room expiry. If that cookie is lost, create a new room; there is no account recovery yet. Do not share the invite publicly.
+3. Press **Enable playback** on the guest device if the browser blocks audio/video autoplay. The host can play, pause, or drag the seek slider and press **Seek**. Both players follow the server timeline, with periodic drift correction. Both can chat and send reactions. The chat shows a live typing indicator while the other person is composing. When the host reaches the end of a film, choose **Choose next film** below the player; the new film replaces the previous one and both players switch to it automatically. Volume is local to each device.
+4. **End room** immediately revokes new access and removes the video and chat. Rooms expire 24 hours after creation; expired data is cleaned every five minutes and before room creation. Active transfers may finish until their existing HTTP request closes.
+
+## Data and architecture
+
+- PostgreSQL stores the two session hashes, one-use invitation hash, room metadata, playback revision/timestamps, the most recent 100 chat messages and 20 reactions. Reactions are shown for five seconds. The version-1 tables are created lazily in an advisory-locked transaction using the existing application role; no reset of existing PostgreSQL volumes is needed. Idempotent migrations add conversion status, video generations and completion state without deleting existing data.
+- HTTP commands are authenticated with a per-room HttpOnly, SameSite=Strict cookie. Only the host can upload, seek, play/pause, and end a room. Both roles can chat/react. The guest invite is in a URL fragment rather than a request URL. Access tokens are random and stored hashed, except for the host-derived invite returned to the authenticated host before redemption.
+- SSE pushes snapshots after state changes and periodically every two seconds to heal missed events. Typing status is ephemeral in API memory, expires automatically after four seconds without refresh, and is never written to chat history or PostgreSQL. The server stores time and position; clients estimate elapsed time with a monotonic clock and correct significant drift. This is not frame-perfect or buffer-coordinated playback. It is intentionally single-instance for now; Redis is still available for future distributed fanout. The UI uses React Icons (Lucide); the API image includes FFmpeg.
+- Browser uploads are limited to 4 MiB chunks. The first container header is checked. MP4 and WebM are served unchanged; MKV is converted by FFmpeg to H.264/AAC MP4 after upload. One conversion runs at a time; the UI reports preparation and failure separately. The first video and first audio stream are used; alternate tracks, embedded subtitles and HDR tone mapping are not supported. An interrupted conversion can restart when the room is reopened. Offset updates use PostgreSQL row locks and fsync before commit. If interrupted, select the same file to resume. A hash of the first/last 64 KiB is an identity hint, not a full-file integrity checksum. A completed upload can be replaced by the host after playback reaches the end. Each replacement increments a video version so both browsers reload the new media; the previous source and converted copy are removed before the next upload begins. A failed MKV can also be replaced without ending the room. Old versioned video URLs and upload/playback commands cannot target the new film. Only one film is active in a room at a time; this is sequential playback, not a queued playlist.
+- Express serves the protected file with HTTP byte-range support, so seeking does not require the entire video in RAM. Next.js streams the media/SSE responses through the same origin; the browser never needs direct API, PostgreSQL or Redis access.
+- Docker stores files under `/var/lib/mahoura/media` in `mahoura-dev_media_data` and `mahoura-prod_media_data`, mounted only into their API services. The volumes are separate from source and compiler output. They survive ordinary `down` and container recreation. Do not use `down -v` unless you intend to delete data.
+- Per environment: up to 12 active rooms, 5 GiB per video, 15 GiB total reserved video space, including an extra 5 GiB reservation per MKV for its converted copy. Both copies are deleted when the room is cleaned up. Ensure enough disk space. Chat and reaction writes are limited to one every 500 ms per role and kind. This is a private MVP, not an internet-scale service. A public deployment needs stronger rate limits, monitoring, HTTPS, explicit secrets/backup policy and deployment review.
+
+## Remote access
+
+`localhost` links work only on the current device. For a first private remote test, use an HTTPS reverse proxy accessible to both people, for example Tailscale Serve on the host with both devices authorized in the tailnet. On Windows run `tailscale serve --bg 3000` from an elevated terminal after configuring the tailnet and HTTPS. Open the **HTTPS URL printed by Serve** on the host before creating the room; the copied invite uses that same origin. Do not expose the database, Redis or NestJS ports. The guest needs Tailscale and permission to access the host service. For a private production-mode deployment, use an HTTPS endpoint restricted to the two participants and point it only at the web service. Public deployment is not supported by this password-free MVP. Proxy streaming responses without buffering and support Range/206; allow uploads of at least 4 MiB per request. A reverse proxy must preserve the public host/protocol and only set trusted forwarded headers. The host machine and Docker must stay running; bandwidth, device codec support and browser autoplay restrictions affect playback. Use media you have permission to share.
+
+## Acceptance tests
+
+```powershell
+pnpm verify
+node scripts/docker-smoke.mjs dev
+pnpm party:smoke dev --mkv
+```
+
+The party smoke test creates a temporary host and guest through Next.js without a password, checks private authorization and one-use invitations, chunk offset/resume and byte ranges, observes typing/play/pause/chat/reaction over SSE, marks the first film complete, uploads a second film into the same room and verifies its new version, then removes the room. The original MP4 transport test uses synthetic binary bytes. The optional `--mkv` test uploads a real tiny synthetic VP9/Opus MKV, checks conversion to MP4 and byte ranges, and verifies that a corrupt MKV fails instead of becoming playable. CI runs it for both environments; production runtime remains to be verified locally.
+
+Manual browser acceptance (two separate profiles/devices, real short MP4): play, pause, seek; check both viewers; send chat and reactions both ways; refresh the guest and verify its session and position; try the already-redeemed invite in a third profile; restart the API and verify the movie still plays and chat remains; end the room and verify protected media is no longer available. A browser interaction may be required once to enable playback. Test remote access separately. An opt-in browser test with a tiny synthetic WebM is also included. Once Playwright Chromium is installed, run `pnpm --filter web exec playwright test` from the repository root with Development running. The CI browser job remains deferred until browser installation is reliable. If Next.js rejects development assets behind your private proxy, add only that proxy hostname to `allowedDevOrigins` in `apps/web/next.config.js` and restart the web container; do not allow arbitrary origins.
